@@ -2,11 +2,16 @@ import os
 import sys
 
 from fastapi import FastAPI
-from configs.configs import MODEL_NAME
 
 sys.path.append(os.getcwd() + '/../LLaVA')
+sys.path.append(os.getcwd() + '/../LLaVA/llava')
+sys.path.append(os.getcwd() + '/../')
+sys.path.append(os.getcwd() + '/../configs')
+sys.path.append(os.getcwd() + '/../model')
 
-from model.TableFormer import TableFormer
+
+from configs.configs import MODEL_NAME
+from TableFormer import TableFormer
 
 app = FastAPI()
 former = TableFormer(MODEL_NAME)
