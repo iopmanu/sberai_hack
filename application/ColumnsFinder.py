@@ -23,9 +23,8 @@ from configs.configs import (
 
 
 class ColumnsFinder:
-    def __init__(self, llava_endpoints: List[str], rudolph_endpoints: List[str], top_k: int = DEFAULT_COLUMNS_QUANTITY):
+    def __init__(self, llava_endpoints: List[str], top_k: int = DEFAULT_COLUMNS_QUANTITY):
         self.llava_endpoints = llava_endpoints
-        self.rudolph_endpoints = rudolph_endpoints
         self.gpt_json = GPT_JSON
         self.top_k = top_k
 
