@@ -27,7 +27,7 @@ async def create_questions(
     return {"questions": result}
 
 
-@app.post("/create_captioning")
+@app.post("/create_captioning/")
 async def create_caption(
         image_file: Annotated[str, Form()]
 ):
