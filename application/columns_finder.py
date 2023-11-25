@@ -83,7 +83,7 @@ class ColumnsFinder:
                     self._request_handler(session, url, {"image_file": image_file}, questions_stash))
                 tasks.append(task)
 
-        await asyncio.gather(*tasks)
+            await asyncio.gather(*tasks)
 
     async def _request_handler(self, session: aiohttp.ClientSession, url, payload, questions_stash: List[str]):
         async with session.post(url, data=payload) as response:
