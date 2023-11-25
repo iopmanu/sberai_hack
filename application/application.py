@@ -12,7 +12,7 @@ sys.path.append(os.getcwd() + '/../model')
 
 from configs.configs import MODEL_NAME
 from configs.configs_app import MODEL_LOGGING, MODEL_TEMPERATURE, MODEL_MAX_NEW_TOKENS
-from TableFormer import TableFormer
+from table_former import TableFormer
 
 app = FastAPI()
 former = TableFormer(MODEL_NAME)
