@@ -1,7 +1,6 @@
 import asyncio
 import aiohttp
 import re
-import torch
 import heapq
 
 import pandas as pd
@@ -57,8 +56,6 @@ class ColumnsFinder:
             size=max(len(image_files) // DEFAULT_IMAGE_QUANTITY_DELIMETER, 1)
         ))
         await self.__fill_questions_stash(images_minibatch, self.questions_stash)
-
-        print(len(self.questions_stash), len([0] * len(self.questions_stash)))
 
         data = pd.DataFrame({'questions': self.questions_stash, 'counts': [0] * len(self.questions_stash)})
         loader = DataFrameLoader(data, page_content_column='questions')
