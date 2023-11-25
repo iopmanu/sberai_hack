@@ -11,22 +11,42 @@ from typing import List, Dict
 
 from langchain.document_loaders import DataFrameLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.embeddings import OpenAIEmbeddings
+from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.vectorstores import FAISS
 
 from configs.configs import (
-    GPT_JSON,
     DEFAULT_COLUMNS_QUANTITY,
     DEFAULT_IMAGE_QUANTITY_DELIMETER,
     DEFAULT_IMAGE_VALIDATION
 )
 
 
+class SentenceTransformerEmbeddings:
+    def __init__(self):
+        model_name = "sentence-transformers/all-mpnet-base-v2"
+        model_kwargs = {'device': 'cuda'}
+        encode_kwargs = {'normalize_embeddings': False}
+        self.embeddings = HuggingFaceEmbeddings(
+            model_name=model_name,
+            model_kwargs=model_kwargs,
+            encode_kwargs=encode_kwargs
+        )
+
+    @property
+    def get_embeddings(self):
+        return self.embeddings
+
+
 class ColumnsFinder:
-    def __init__(self, llava_endpoints: List[str], top_k: int = DEFAULT_COLUMNS_QUANTITY):
+    def __init__(
+            self,
+            llava_endpoints: List[str],
+            top_k: int = DEFAULT_COLUMNS_QUANTITY,
+            embeddings=SentenceTransformerEmbeddings()
+    ):
         self.llava_endpoints = llava_endpoints
-        self.gpt_json = GPT_JSON
         self.top_k = top_k
+        self.embeddings = embeddings.get_embeddings
 
         self.questions_stash = []
         self.question_db: FAISS = None
@@ -38,15 +58,16 @@ class ColumnsFinder:
         ))
         await self.__fill_questions_stash(images_minibatch, self.questions_stash)
 
+        print(len(self.questions_stash), len([0] * len(self.questions_stash)))
+
         data = pd.DataFrame({'questions': self.questions_stash, 'counts': [0] * len(self.questions_stash)})
-        loader = DataFrameLoader(data, page_content_column='question')
+        loader = DataFrameLoader(data, page_content_column='questions')
         documents = loader.load()
 
         text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=0)
         texts = text_splitter.split_documents(documents)
 
-        embeddings = OpenAIEmbeddings(openai_api_key=self.gpt_json['openai_api_key'])
-        self.question_db = FAISS.from_documents(texts, embeddings)
+        self.question_db = FAISS.from_documents(texts, self.embeddings)
 
         return images_minibatch
 
@@ -103,7 +124,3 @@ class ColumnsFinder:
 
     def _distribute_questions_creation(self, index: int, endpoint: str) -> str:
         return self.llava_endpoints[index % len(self.llava_endpoints)] + f'/{endpoint}/'
-
-
-if __name__ == "__main__":
-    print(torch.cuda.is_available())
