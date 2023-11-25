@@ -38,7 +38,7 @@ class ColumnsFinder:
         ))
         await self.__fill_questions_stash(images_minibatch, self.questions_stash)
 
-        data = pd.DataFrame({'questions': self.questions_stash, 'counts': [0] * len(images_minibatch)})
+        data = pd.DataFrame({'questions': self.questions_stash, 'counts': [0] * len(self.questions_stash)})
         loader = DataFrameLoader(data, page_content_column='question')
         documents = loader.load()
 
