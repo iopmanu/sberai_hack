@@ -121,3 +121,7 @@ class ColumnsFinder:
 
     def _distribute_questions_creation(self, index: int, endpoint: str) -> str:
         return self.llava_endpoints[index % len(self.llava_endpoints)] + f'/{endpoint}/'
+
+    def clear_stash(self):
+        self.questions_stash = []
+        self.question_db = None

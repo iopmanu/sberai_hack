@@ -5,9 +5,9 @@ import openai
 
 from typing import List
 
-from configs.configs import GPT_JSON, NUM_SECONDS_TO_SLEEP
+from configs.configs import NUM_SECONDS_TO_SLEEP, GPT_OPENAI_API_KEY, GPT_EVALUATION_QUESTIONS_RELEVANCE_PROMPT
 
-os.environ['OPENAI_API_KEY'] = GPT_JSON['openai_api_key']
+os.environ['OPENAI_API_KEY'] = GPT_OPENAI_API_KEY
 
 
 @ray.remote(num_cpus=1)
@@ -50,7 +50,7 @@ def create_contents(sentence: str, questions: List[str], prompt: str):
     return contents
 
 
-def eval(sentence, questions, prompt, max_tokens: int):
+def eval(sentence, questions, max_tokens: int, prompt: str = GPT_EVALUATION_QUESTIONS_RELEVANCE_PROMPT):
     handles = []
     for content in create_contents(sentence, questions, prompt):
         handles.append(get_eval.remote(content, max_tokens))

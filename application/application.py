@@ -20,7 +20,7 @@ former = TableFormer(MODEL_NAME)
 
 @app.post("/create_questions/")
 async def create_questions(
-        image_file: Annotated[str, Form()],
+        image_file: Annotated[str, Form()]
 ):
     result = await former.create_questions(image_file=image_file, logging=MODEL_LOGGING,
                                            temperature=MODEL_TEMPERATURE, max_new_tokens=MODEL_MAX_NEW_TOKENS)
@@ -40,7 +40,7 @@ async def create_caption(
 @app.post("/create_vqa/")
 async def create_vqa(
         image_file: Annotated[str, Form()],
-        question: Annotated[str, Form()],
+        question: Annotated[str, Form()]
 
 ):
     result = await former.predict(image_file=image_file, input=question, logging=MODEL_LOGGING,
