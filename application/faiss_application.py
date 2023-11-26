@@ -15,7 +15,7 @@ async def fill_questions_db(
     if cf.question_db is not None:
         cf.clear_stash()
 
-    return {"questions": cf.create_column_names(image_files)}
+    return {"questions": await cf.create_column_names(image_files)}
 
 
 @app.get("/get_nearest_question/")
