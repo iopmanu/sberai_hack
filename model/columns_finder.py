@@ -53,7 +53,7 @@ class ColumnsFinder:
     async def create_faiss_questions(self, image_files: List[str]):
         images_minibatch = list(np.random.choice(
             image_files,
-            int(np.ceil(len(image_files) // DEFAULT_IMAGE_QUANTITY_DELIMETER, 1))
+            size=max(len(image_files) // DEFAULT_IMAGE_QUANTITY_DELIMETER, 1)
         ))
         await self.__fill_questions_stash(images_minibatch, self.questions_stash)
 
@@ -74,7 +74,7 @@ class ColumnsFinder:
 
         validation_images = np.random.choice(
             validation_qeustions := [question for question in image_files if question not in images_minibatch],
-            int(np.ceil(len(validation_qeustions) // DEFAULT_IMAGE_VALIDATION))
+            size=max(len(validation_qeustions) // DEFAULT_IMAGE_VALIDATION, 1)
         )
         validation_questions = []
         await self.__fill_questions_stash(validation_images, validation_questions)
