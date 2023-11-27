@@ -1,21 +1,31 @@
+import sys
+import os
+
 from typing import Annotated, List
 from fastapi import FastAPI, Form, HTTPException
 
+sys.path.append(os.getcwd() + '/../')
+sys.path.append(os.getcwd() + '/../')
+
+
 from model.columns_finder import ColumnsFinder
-from configs.configs import LLAVA_ENDPOINTS
+from configs.configs import LLAVA_URLS
 
 app = FastAPI()
-cf = ColumnsFinder(LLAVA_ENDPOINTS)
+cf = ColumnsFinder(LLAVA_URLS)
 
 
 @app.post("/fill_questions_db/")
 async def fill_questions_db(
-        image_files: List[str]
+        image_files: Annotated[str, Form()]
 ):
+
+    image_files = image_files.split(' ')
     if cf.question_db is not None:
         cf.clear_stash()
 
-    return {"questions": await cf.create_column_names(image_files)}
+    columns = await cf.create_column_names(image_files)
+    return columns
 
 
 @app.get("/get_nearest_question/")
