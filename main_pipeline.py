@@ -40,7 +40,8 @@ class Controller:
                 for question in self.columns:
                     task = asyncio.ensure_future(
                         self._request_vqa_handler(session=session, url=url, answers=answers_ordered, index=i,
-                                                  payload={"image_file": image_file, "question": question},
+                                                  payload={"image_file": image_file,
+                                                           "question": question + 'Please answer one number, word or phrase.'},
                                                   vqa_evaluation_handles=vqa_evaluation_pairs)
                     )
 
