@@ -17,7 +17,7 @@ class Controller:
     DIRECTORY = '../data/questions.json'
 
     def __init__(self, rudolph_urls=None, llava_urls=LLAVA_URLS, user_columns=None):
-        self.llava_urls = llava_urls,
+        self.llava_urls = llava_urls
         self.rudolph_urls = rudolph_urls if rudolph_urls is not None else []
         self.evaluation_on = EVALUATION_ON
         self.columns = user_columns if user_columns is not None else []
@@ -25,7 +25,8 @@ class Controller:
 
     async def main_pipeline(self, image_files):
         columns = json.loads(
-            requests.post(f'{FAISS_APPLICATION_URL[0]}/fill_questions_db/', data={"image_files": image_files}).text)
+            requests.post(f'{FAISS_APPLICATION_URL[0]}/fill_questions_db/',
+                          data={"image_files": ' '.join(image_files)}).text)
         self.columns += columns
 
         answers_ordered = {column: {} for column in self.columns}
@@ -56,8 +57,8 @@ class Controller:
                 "dataframe": self._create_dataframe(answers_ordered)}
 
     @staticmethod
-    def _create_dataframe(answers: Dict[Dict[int, str]]):
-        pass
+    def _create_dataframe(answers: Dict[str, Dict[int, str]]):
+        return answers
 
     async def _request_vqa_handler(self, session: aiohttp.ClientSession, url, payload,
                                    answers: Dict[str, Dict[int, str]], index: int, vqa_evaluation_handles: List):
