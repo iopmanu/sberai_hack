@@ -7,7 +7,6 @@ from fastapi import FastAPI, Form, HTTPException
 sys.path.append(os.getcwd() + '/../')
 sys.path.append(os.getcwd() + '/../')
 
-
 from model.columns_finder import ColumnsFinder
 from configs.configs import LLAVA_URLS
 
@@ -19,7 +18,6 @@ cf = ColumnsFinder(LLAVA_URLS)
 async def fill_questions_db(
         image_files: Annotated[str, Form()]
 ):
-
     image_files = image_files.split(' ')
     if cf.question_db is not None:
         cf.clear_stash()

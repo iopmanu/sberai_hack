@@ -41,7 +41,7 @@ class Controller:
                     task = asyncio.ensure_future(
                         self._request_vqa_handler(session=session, url=url, answers=answers_ordered, index=i,
                                                   payload={"image_file": image_file,
-                                                           "question": question + 'Please answer one number, word or phrase.'},
+                                                           "question": question + ' Please answer one number, word or phrase.'},
                                                   vqa_evaluation_handles=vqa_evaluation_pairs)
                     )
 
@@ -58,8 +58,17 @@ class Controller:
                 "dataframe": self._create_dataframe(answers_ordered)}
 
     @staticmethod
-    def _create_dataframe(answers: Dict[str, Dict[int, str]]):
-        return answers
+    def _create_dataframe(answers: Dict):
+        data = {}
+
+        for column, responses_ordered in answers['dataframe'].items():
+            values = []
+            for task_id, response in dict(sorted(responses_ordered.items())).items():
+                values.append(response['outputs'].rstrip('</s>'))
+
+            data[column] = values
+
+        return pd.DataFrame(data)
 
     async def _request_vqa_handler(self, session: aiohttp.ClientSession, url, payload,
                                    answers: Dict[str, Dict[int, str]], index: int, vqa_evaluation_handles: List):
@@ -70,7 +79,7 @@ class Controller:
                 if self.evaluation_on and np.random.choice([False, True]):
                     vqa_evaluation_handles.append({data['question']: data['answer']})
 
-                answers[data['question']][index] = data['answer']
+                answers[data['question'].rstrip(' Please answer one number, word or phrase.')][index] = data['answer']
             else:
                 print("Request failed with status code:", response.status)
 
