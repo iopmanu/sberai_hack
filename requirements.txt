@@ -31,3 +31,8 @@ pandas~=1.5.3
 packaging~=23.2
 aiohttp~=3.9.0
 langchain~=0.0.339
+
+#tg bot
+pytelegrambotapi==4.14.0
+pytube==15.0.0
+validators==0.18.2
