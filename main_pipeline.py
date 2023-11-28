@@ -10,7 +10,7 @@ from evaluation.gpt_questions_evaluation import questions_eval
 from evaluation.gpt_vqa_evaluation import vqa_eval
 from typing import Dict, List
 
-from configs.configs import LLAVA_URLS, EVALUATION_ON, FAISS_APPLICATION_URL
+from configs.configs import LLAVA_URLS, EVALUATION_ON, FAISS_APPLICATION_URL, MAIN_PIPELINE_TIMEOUT
 
 
 class Controller:
@@ -26,13 +26,13 @@ class Controller:
     async def main_pipeline(self, image_files):
         columns = json.loads(
             requests.post(f'{FAISS_APPLICATION_URL[0]}/fill_questions_db/',
-                          data={"image_files": ' '.join(image_files)}, timeout=7200).text)
+                          data={"image_files": ' '.join(image_files)}, timeout=MAIN_PIPELINE_TIMEOUT).text)
         self.columns += columns
 
         answers_ordered = {column: {} for column in self.columns}
         tasks = []
 
-        async with aiohttp.ClientSession(timeout=7200) as session:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=MAIN_PIPELINE_TIMEOUT)) as session:
             for i, image_file in enumerate(image_files):
                 url = self._distribute_questions_creation(i, "create_vqa")
                 vqa_evaluation_pairs = []
