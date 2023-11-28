@@ -26,13 +26,13 @@ class Controller:
     async def main_pipeline(self, image_files):
         columns = json.loads(
             requests.post(f'{FAISS_APPLICATION_URL[0]}/fill_questions_db/',
-                          data={"image_files": ' '.join(image_files)}).text)
+                          data={"image_files": ' '.join(image_files)}, timeout=7200).text)
         self.columns += columns
 
         answers_ordered = {column: {} for column in self.columns}
         tasks = []
 
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(timeout=7200) as session:
             for i, image_file in enumerate(image_files):
                 url = self._distribute_questions_creation(i, "create_vqa")
                 vqa_evaluation_pairs = []
