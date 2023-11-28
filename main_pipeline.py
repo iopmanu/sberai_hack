@@ -58,10 +58,10 @@ class Controller:
                 "dataframe": self._create_dataframe(answers_ordered)}
 
     @staticmethod
-    def _create_dataframe(answers: Dict):
+    def _create_dataframe(answers: Dict[str, Dict]):
         data = {}
 
-        for column, responses_ordered in answers['dataframe'].items():
+        for column, responses_ordered in answers.items():
             values = []
             for task_id, response in dict(sorted(responses_ordered.items())).items():
                 values.append(response['outputs'].rstrip('</s>'))
