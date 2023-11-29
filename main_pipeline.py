@@ -14,14 +14,13 @@ from configs.configs import LLAVA_URLS, EVALUATION_ON, FAISS_APPLICATION_URL, MA
 
 
 class Controller:
-    DIRECTORY = '../data/questions.json'
-
-    def __init__(self, rudolph_urls=None, llava_urls=LLAVA_URLS, user_columns=None):
+    def __init__(self, rudolph_urls=None, llava_urls=LLAVA_URLS, user_columns=None, qa_eval_df: pd.DataFrame = None):
         self.llava_urls = llava_urls
         self.rudolph_urls = rudolph_urls if rudolph_urls is not None else []
         self.evaluation_on = EVALUATION_ON
         self.columns = user_columns if user_columns is not None else []
         self.vqa_evaluation = []
+        self.qa_eval_df = qa_eval_df
 
     async def main_pipeline(self, image_files):
         columns = json.loads(
@@ -87,13 +86,11 @@ class Controller:
         urls = self.llava_urls + self.rudolph_urls
         return urls[index % len(urls)] + f'/{endpoint}/'
 
-    @staticmethod
-    def _eval_question_pairs():
-        # TODO: add questions file
-        questions_from_file = []
+    def _eval_question_pairs(self):
+        questions_from_files = list(self.qa_eval_df['question'].values) if self.qa_eval_df is not None else []
 
         pairs = []
-        for question in list(np.random.choice(questions_from_file, size=min(len(questions_from_file), 3))):
+        for question in list(np.random.choice(questions_from_files, size=min(len(questions_from_files), 3))):
             pair = json.loads(requests.get(f'{FAISS_APPLICATION_URL[0]}/get_nearest_question/',
                                            data={'question': question}).text)
             pairs.append(pair)
