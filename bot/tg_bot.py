@@ -25,6 +25,7 @@ FEEDBACK_BAD = "👎"
 feedbacks = []
 feedbacks_fname = f"feedbacks_{datetime.datetime.now()}.csv"
 
+
 class MyStates(StatesGroup):
     start = State()
     upload_zip = State()
