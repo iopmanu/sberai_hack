@@ -3,7 +3,7 @@ import logging
 import pandas as pd
 from pytube import YouTube
 
-logger = logging.getLogger()
+logger = logging.getLogger("bot")
 
 
 def get_video(link: str):
@@ -12,7 +12,7 @@ def get_video(link: str):
     if len(streams) == 0:
         raise LookupError("Cant download video")
     stream = streams[0]
-    fname = stream.download()
+    fname = stream.download(skip_existing=False)
     logger.info(f'downloaded {fname}')
     return yt.title, fname
 
