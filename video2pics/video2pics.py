@@ -9,7 +9,7 @@ OUTPUT_DIR = PROJECT_ROOT / "./output_pics/"
 TIME_SKIPS = float(1000) # 1000 - 1 second
 
 
-def video2pics(filename):
+def video2frames(filename):
     if os.path.exists(OUTPUT_DIR):
         shutil.rmtree(OUTPUT_DIR)
     os.mkdir(OUTPUT_DIR)
