@@ -33,4 +33,4 @@ async def get_nearest_question(
     if cf.question_db is None:
         raise HTTPException(status_code=400, detail="Question database isn't full.")
 
-    return {question: cf.question_db.max_relevance_search(question)[0].page_content}
+    return {question: cf.question_db.max_marginal_relevance_search(question)[0].page_content}
