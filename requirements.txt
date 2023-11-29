@@ -36,3 +36,6 @@ langchain~=0.0.339
 pytelegrambotapi==4.14.0
 pytube==15.0.0
 validators==0.18.2
+
+#video2pics
+opencv-python
