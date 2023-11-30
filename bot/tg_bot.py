@@ -70,10 +70,16 @@ def handle_video(message):
         bot.send_message(message.chat.id, "Видео загружается. Подождите, пожалуйста. ")
         title, video_fname = get_video(message.text)
     except LookupError:
-        bot.reply_to(message, "Cant download video")
+        bot.set_state(message.from_user.id, MyStates.start, message.chat.id)
+        bot.send_message(message.chat.id, "Не удалось загрузить видео. Попробуйте, пожалуйста, ещё раз. ")
         return
-    images_path = process_video(video_fname)
-    print('images processed')
+    try:
+        images_path = process_video(video_fname)
+        logger.info('images processed')
+    except Exception as e:
+        bot.set_state(message.from_user.id, MyStates.start, message.chat.id)
+        bot.send_message(message.chat.id, "Не удалось обработать видео. Попробуйте, пожалуйста, ещё раз. ")
+        return
     input_processed_info(message, images_path, msg='Видео загружено')
 
 
@@ -95,9 +101,7 @@ def handle_feedback(message):
     feedbacks.append((now, message.chat.id, message.text))
     pd.DataFrame(feedbacks, columns=['time', 'chat_id', 'text']).to_csv(feedbacks_fname, index=False)
     bot.delete_state(message.from_user.id, message.chat.id)
-    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
-    btn = types.KeyboardButton("/start")
-    markup.add(btn)
+    markup = add_buttons(["/start"])
     bot.send_message(message.chat.id, "Спасибо за обратную связь!",
                      reply_markup=markup)
 
@@ -105,13 +109,19 @@ def handle_feedback(message):
 @bot.message_handler(content_types=['text'])
 def send_welcome(message):
     bot.set_state(message.from_user.id, MyStates.start, message.chat.id)
-    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
-    btn1 = types.KeyboardButton("Картинки (zip)")
-    btn2 = types.KeyboardButton("Видео (ссылка)")
-    markup.add(btn1, btn2)
+    markup = add_buttons(["Картинки (zip)", "Видео (ссылка)"])
     bot.send_message(message.chat.id,
                      "Привет, {0.first_name}... . Выбери формат загружаемых данных.".format(message.from_user),
                      reply_markup=markup)
+
+
+def add_buttons(button_texts: List[str]):
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
+    buttons = []
+    for text in button_texts:
+        buttons.append(types.KeyboardButton(text))
+    markup.add(*buttons)
+    return markup
 
 
 def input_processed_info(message, images_path, msg='Картинки загружены'):
@@ -120,25 +130,26 @@ def input_processed_info(message, images_path, msg='Картинки загру�
         data['images_folder'] = images_path
         data['questions'] = []
 
-    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
-    btn = types.KeyboardButton("Завершить ввод вопросов")
-    markup.add(btn)
+    markup = add_buttons(["Завершить ввод вопросов"])
     bot.send_message(message.chat.id, f"{msg}. Введите вопросы, на которые вы хотите получить ответы: ",
                      reply_markup=markup)
 
 
 def ask_questions(message):
-    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
-    btn = types.KeyboardButton("Завершить ввод вопросов")
-    markup.add(btn)
+    markup = add_buttons(["Завершить ввод вопросов"])
     bot.reply_to(message, "Вопрос записан, вы можете задать следующий вопрос.", reply_markup=markup)
 
 
 def generate_and_get_feedback(message):
-    with bot.retrieve_data(message.from_user.id, message.chat.id) as data:
-        res = generate(images_folder=data['images_folder'], questions=data['questions'])
-    csv_path = f'df_{message.chat.id}.csv'
-    res.to_csv(csv_path, index=False)
+    try:
+        with bot.retrieve_data(message.from_user.id, message.chat.id) as data:
+            res = generate(images_folder=data['images_folder'], questions=data['questions'])
+        csv_path = f'df_{message.chat.id}.csv'
+        res.to_csv(csv_path, index=False)
+    except Exception as e:
+        logger.error(e)
+        bot.set_state(message.from_user.id, MyStates.start, message.chat.id)
+        bot.send_message(message.chat.id, "Генерация завершилась неуспешно. Попробуйте, пожалуйста, ещё раз. ")
     bot.send_message(message.chat.id, "Данные успешно сгенерированы. ")
     bot.send_document(chat_id=message.chat.id, document=open(csv_path, 'rb'))
     ask_feedback(message)
@@ -146,10 +157,7 @@ def generate_and_get_feedback(message):
 
 def ask_feedback(message):
     bot.set_state(message.from_user.id, MyStates.feedback, message.chat.id)
-    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
-    btn1 = types.KeyboardButton(FEEDBACK_OK)
-    btn2 = types.KeyboardButton(FEEDBACK_BAD)
-    markup.add(btn1, btn2)
+    markup = add_buttons([FEEDBACK_OK, FEEDBACK_BAD])
     bot.send_message(message.chat.id, "Оцените, пожалуйста, результат генерации".format(message.from_user),
                      reply_markup=markup)
 
@@ -161,7 +169,7 @@ def process_video(video_fname: str) -> str:
 
 
 def generate(images_folder: str, questions: List[str]) -> pd.DataFrame:
-    # process images and get result
+    # process images and return dataframe
     res = pd.DataFrame({'test': [1]})
     print('images folder', images_folder)
     print('questions', questions)
