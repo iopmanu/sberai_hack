@@ -14,15 +14,17 @@ from configs.configs import LLAVA_URLS, EVALUATION_ON, FAISS_APPLICATION_URL, MA
 
 
 class Controller:
-    def __init__(self, rudolph_urls=None, llava_urls=LLAVA_URLS, user_columns=None, qa_eval_df: pd.DataFrame = None):
+    def __init__(self, rudolph_urls=None, llava_urls=LLAVA_URLS, qa_eval_df: pd.DataFrame = None):
         self.llava_urls = llava_urls
         self.rudolph_urls = rudolph_urls if rudolph_urls is not None else []
         self.evaluation_on = EVALUATION_ON
-        self.columns = user_columns if user_columns is not None else []
+        self.columns = []
         self.vqa_evaluation = []
         self.qa_eval_df = qa_eval_df
 
-    async def main_pipeline(self, image_files):
+    async def main_pipeline(self, image_files: List[str], user_columns: List[str] = None):
+        self.columns = user_columns if user_columns is not None else []
+
         columns = json.loads(
             requests.post(f'{FAISS_APPLICATION_URL[0]}/fill_questions_db/',
                           data={"image_files": ' '.join(image_files)}, timeout=MAIN_PIPELINE_TIMEOUT).text)
