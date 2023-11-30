@@ -1,7 +1,7 @@
 import shutil
 import sys
 import os
-sys.path.append(os.path.abspath('~/sberai_hack'))
+sys.path.append('/home/jovyan/sberai_hack')
 print(sys.path)
 
 import asyncio
@@ -144,8 +144,8 @@ def handle_questions(message):
 def handle_feedback(message):
     log_message(message)
     now = datetime.datetime.now()
-    feedbacks.append((now, message.chat.id, message.text))
-    pd.DataFrame(feedbacks, columns=['time', 'chat_id', 'text']).to_csv(feedbacks_fname, index=False)
+    feedbacks.append((now, message.from_user.username, message.chat.id, message.text))
+    pd.DataFrame(feedbacks, columns=['time', 'username', 'chat_id', 'text']).to_csv(feedbacks_fname, index=False)
     bot.delete_state(message.from_user.id, message.chat.id)
     markup = add_buttons(["/start"])
     bot.send_message(message.chat.id, "Спасибо за обратную связь!",
@@ -232,7 +232,7 @@ def process_video(video_fname: str, output_dir):
 
 def generate(images_folder: str, questions: List[str]) -> pd.DataFrame:
     # process images and return dataframe
-    res = pd.DataFrame({'test': [1]})
+    df = pd.DataFrame({'test': [1]})
     print('images folder', images_folder)
     print('questions', questions)
     controller = Controller()
