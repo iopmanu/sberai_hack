@@ -3,7 +3,7 @@ import os
 from typing import List, Dict
 
 from configs.configs import GPT_EVALUATION_QUESTIONS_PROMPT, GPT_OPENAI_API_KEY
-from gpt_evaluation import get_eval
+from evaluation.gpt_evaluation import get_eval
 
 os.environ['OPENAI_API_KEY'] = GPT_OPENAI_API_KEY
 

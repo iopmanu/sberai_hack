@@ -39,3 +39,4 @@ validators==0.18.2
 
 #video2pics
 opencv-python
+nest_asyncio==1.5.8

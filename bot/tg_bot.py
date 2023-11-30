@@ -1,9 +1,11 @@
+import asyncio
 import io
 import logging
 import os
 import zipfile
 import datetime
 
+import nest_asyncio
 import telebot
 import validators
 import pandas as pd
@@ -14,6 +16,9 @@ from telebot import types, custom_filters, StateMemoryStorage
 from telebot.handler_backends import StatesGroup, State
 
 from bot.tools import get_video, save_csv
+from main_pipeline import Controller
+# from main_pipeline import Controller
+from video2pics import video2frames
 
 state_storage = StateMemoryStorage()
 bot = telebot.TeleBot(os.getenv("TELEGRAM_API_KEY"), state_storage=state_storage)
@@ -68,19 +73,22 @@ def handle_video(message):
         return
     try:
         bot.send_message(message.chat.id, "Видео загружается. Подождите, пожалуйста. ")
-        title, video_fname = get_video(message.text)
+        output_path = str(message.chat.id)
+        filename = 'video.mp4'
+        title = get_video(message.text, output_path=output_path, filename=filename)
     except LookupError:
         bot.set_state(message.from_user.id, MyStates.start, message.chat.id)
         bot.send_message(message.chat.id, "Не удалось загрузить видео. Попробуйте, пожалуйста, ещё раз. ")
         return
     try:
-        images_path = process_video(video_fname)
+        output_dir = os.path.join(str(message.chat.id), 'images')
+        process_video(os.path.join(output_path, filename), output_dir)
         logger.info('images processed')
     except Exception as e:
         bot.set_state(message.from_user.id, MyStates.start, message.chat.id)
         bot.send_message(message.chat.id, "Не удалось обработать видео. Попробуйте, пожалуйста, ещё раз. ")
         return
-    input_processed_info(message, images_path, msg='Видео загружено')
+    input_processed_info(message, output_dir, msg='Видео загружено')
 
 
 @bot.message_handler(content_types=['text'], state=MyStates.send_questions)
@@ -148,8 +156,10 @@ def generate_and_get_feedback(message):
         res.to_csv(csv_path, index=False)
     except Exception as e:
         logger.error(e)
+        print(e)
         bot.set_state(message.from_user.id, MyStates.start, message.chat.id)
         bot.send_message(message.chat.id, "Генерация завершилась неуспешно. Попробуйте, пожалуйста, ещё раз. ")
+        return
     bot.send_message(message.chat.id, "Данные успешно сгенерированы. ")
     bot.send_document(chat_id=message.chat.id, document=open(csv_path, 'rb'))
     ask_feedback(message)
@@ -162,10 +172,9 @@ def ask_feedback(message):
                      reply_markup=markup)
 
 
-def process_video(video_fname: str) -> str:
+def process_video(video_fname: str, output_dir):
     # split video to images and save to folder
-    result_folder_path = "some_images_path"
-    return result_folder_path
+    video2frames(video_fname, output_dir)
 
 
 def generate(images_folder: str, questions: List[str]) -> pd.DataFrame:
@@ -173,7 +182,22 @@ def generate(images_folder: str, questions: List[str]) -> pd.DataFrame:
     res = pd.DataFrame({'test': [1]})
     print('images folder', images_folder)
     print('questions', questions)
+    controller = Controller()
+    images = list(sorted(os.listdir(images_folder), key=get_number))
+    loop = asyncio.new_event_loop()
+    nest_asyncio.apply(loop)
+    # asyncio.set_event_loop(asyncio.new_event_loop())
+    # loop = asyncio.get_running_loop()
+    future = asyncio.ensure_future(controller.main_pipeline(images, questions), loop=loop)
+    loop.run_until_complete(future)
+    res = future.result()
+    df = res['dataframe']
     return res
+
+
+def get_number(image_path: str):
+    basename = os.path.basename(image_path)
+    return int(basename.split(".")[0])
 
 
 def main():
