@@ -1,9 +1,15 @@
+import shutil
+import sys
+import os
+sys.path.append(os.path.abspath('~/sberai_hack'))
+print(sys.path)
+
 import asyncio
 import io
 import logging
-import os
 import zipfile
 import datetime
+import traceback
 
 import nest_asyncio
 import telebot
@@ -11,28 +17,42 @@ import validators
 import pandas as pd
 
 from typing import List
-from pytube import YouTube
+from pathlib import Path
 from telebot import types, custom_filters, StateMemoryStorage
 from telebot.handler_backends import StatesGroup, State
 
-from bot.tools import get_video, save_csv
+from bot.tools import get_video
 from main_pipeline import Controller
-# from main_pipeline import Controller
 from video2pics import video2frames
 
 state_storage = StateMemoryStorage()
 bot = telebot.TeleBot(os.getenv("TELEGRAM_API_KEY"), state_storage=state_storage)
+
+Path("logs").mkdir(parents=True, exist_ok=True)
+formatter = logging.Formatter('[%(asctime)s] [%(filename)s.%(lineno)d] %(message)s')
 logger = logging.getLogger("bot")
+logger.setLevel(logging.DEBUG)
+fh = logging.FileHandler(f"logs/bot_{datetime.datetime.now()}.log")
+fh.setLevel(logging.DEBUG)
+fh.setFormatter(formatter)
+logger.addHandler(fh)
+fh = logging.FileHandler(f"logs/telebot_{datetime.datetime.now()}.log")
+fh.setLevel(logging.DEBUG)
+fh.setFormatter(formatter)
+telebot.logger.setLevel(logging.DEBUG)
+telebot.logger.addHandler(fh)
 
 FEEDBACK_OK = "👍"
 FEEDBACK_BAD = "👎"
+ASK_QUESTION = """Введите вопросы, на которые вы хотите получить ответы:
+Пример: сколько людей на изображении? Доволен ли человек на изображении?"""
 
 feedbacks = []
 feedbacks_fname = f"feedbacks_{datetime.datetime.now()}.csv"
 
 
 class MyStates(StatesGroup):
-    start = State()
+    choice_upload_method = State()
     upload_zip = State()
     upload_video = State()
     send_questions = State()
@@ -40,34 +60,49 @@ class MyStates(StatesGroup):
     feedback = State()
 
 
+@bot.message_handler(commands=['start'])
+def handle_start(message):
+    send_welcome_message(message)
+
+
 @bot.message_handler(commands=['get_state'])
-def get_state(message):
-    bot.send_message(message.chat.id, str(bot.get_state(message.from_user.id, message.chat.id)))
+def handle_get_state(message):
+    log_message(message)
+    state = get_state(message)
+    bot.send_message(message.chat.id, state)
 
 
-@bot.message_handler(content_types=['text'], state=MyStates.start)
+@bot.message_handler(content_types=['text'], state=MyStates.choice_upload_method)
 def handle_text(message):
+    log_message(message)
     if message.text == "Картинки (zip)":
         bot.set_state(message.from_user.id, MyStates.upload_zip, message.chat.id)
         bot.reply_to(message, "Отправьте zip архив с картинками")
-    if message.text == "Видео (ссылка)":
+    elif message.text == "Видео (ссылка)":
         bot.set_state(message.from_user.id, MyStates.upload_video, message.chat.id)
         bot.reply_to(message, "Отправьте ссылку на видео в Youtube")
+    else:
+        markup = add_buttons(["Картинки (zip)", "Видео (ссылка)"])
+        bot.send_message(message.chat.id, "Выберите формат загружаемых данных.",
+                         reply_markup=markup)
 
 
 @bot.message_handler(content_types=['document'], state=MyStates.upload_zip)
 def handle_zip(message):
+    log_message(message)
     file_info = bot.get_file(message.document.file_id)
-    logger.debug(f"file_info: {file_info}")
+    logger.info(f"file_info: {file_info}")
     bytes = bot.download_file(file_info.file_path)
     z = zipfile.ZipFile(io.BytesIO(bytes))
-    images_path = f'unzipped_images_{message.chat.id}'
+    images_path = os.path.join(str(message.chat.id), 'images')
+    shutil.rmtree(images_path, ignore_errors=True)
     z.extractall(path=images_path)
     input_processed_info(message, images_path, msg='Картинки загружены')
 
 
 @bot.message_handler(content_types=['text'], state=MyStates.upload_video)
 def handle_video(message):
+    log_message(message)
     if not validators.url(message.text):
         bot.reply_to(message, "Отправьте ссылку")
         return
@@ -77,15 +112,16 @@ def handle_video(message):
         filename = 'video.mp4'
         title = get_video(message.text, output_path=output_path, filename=filename)
     except LookupError:
-        bot.set_state(message.from_user.id, MyStates.start, message.chat.id)
+        bot.set_state(message.from_user.id, MyStates.choice_upload_method, message.chat.id)
         bot.send_message(message.chat.id, "Не удалось загрузить видео. Попробуйте, пожалуйста, ещё раз. ")
         return
     try:
         output_dir = os.path.join(str(message.chat.id), 'images')
+        shutil.rmtree(output_dir, ignore_errors=True)
         process_video(os.path.join(output_path, filename), output_dir)
-        logger.info('images processed')
+        print('images processed')
     except Exception as e:
-        bot.set_state(message.from_user.id, MyStates.start, message.chat.id)
+        bot.set_state(message.from_user.id, MyStates.choice_upload_method, message.chat.id)
         bot.send_message(message.chat.id, "Не удалось обработать видео. Попробуйте, пожалуйста, ещё раз. ")
         return
     input_processed_info(message, output_dir, msg='Видео загружено')
@@ -93,6 +129,7 @@ def handle_video(message):
 
 @bot.message_handler(content_types=['text'], state=MyStates.send_questions)
 def handle_questions(message):
+    log_message(message)
     if message.text == 'Завершить ввод вопросов':
         bot.set_state(message.from_user.id, MyStates.generation, message.chat.id)
         bot.reply_to(message, "Генерация данных начата. Подождите, пожалуйста.")
@@ -105,6 +142,7 @@ def handle_questions(message):
 
 @bot.message_handler(content_types=['text'], state=MyStates.feedback)
 def handle_feedback(message):
+    log_message(message)
     now = datetime.datetime.now()
     feedbacks.append((now, message.chat.id, message.text))
     pd.DataFrame(feedbacks, columns=['time', 'chat_id', 'text']).to_csv(feedbacks_fname, index=False)
@@ -114,12 +152,17 @@ def handle_feedback(message):
                      reply_markup=markup)
 
 
-@bot.message_handler(content_types=['text'])
-def send_welcome(message):
-    bot.set_state(message.from_user.id, MyStates.start, message.chat.id)
+@bot.message_handler()
+def handle_any_text(message):
+    send_welcome_message(message)
+
+
+def send_welcome_message(message):
+    log_message(message)
+    bot.set_state(message.from_user.id, MyStates.choice_upload_method, message.chat.id)
     markup = add_buttons(["Картинки (zip)", "Видео (ссылка)"])
     bot.send_message(message.chat.id,
-                     "Привет, {0.first_name}... . Выбери формат загружаемых данных.".format(message.from_user),
+                     "Привет, {0.first_name}... . Выберите формат загружаемых данных.".format(message.from_user),
                      reply_markup=markup)
 
 
@@ -139,7 +182,8 @@ def input_processed_info(message, images_path, msg='Картинки загру�
         data['questions'] = []
 
     markup = add_buttons(["Завершить ввод вопросов"])
-    bot.send_message(message.chat.id, f"{msg}. Введите вопросы, на которые вы хотите получить ответы: ",
+    bot.send_message(message.chat.id,
+                     f"""{msg}. {ASK_QUESTION}""",
                      reply_markup=markup)
 
 
@@ -155,9 +199,9 @@ def generate_and_get_feedback(message):
         csv_path = f'df_{message.chat.id}.csv'
         res.to_csv(csv_path, index=False)
     except Exception as e:
-        logger.error(e)
         print(e)
-        bot.set_state(message.from_user.id, MyStates.start, message.chat.id)
+        print(traceback.format_exc())
+        bot.set_state(message.from_user.id, MyStates.choice_upload_method, message.chat.id)
         bot.send_message(message.chat.id, "Генерация завершилась неуспешно. Попробуйте, пожалуйста, ещё раз. ")
         return
     bot.send_message(message.chat.id, "Данные успешно сгенерированы. ")
@@ -172,6 +216,15 @@ def ask_feedback(message):
                      reply_markup=markup)
 
 
+def get_state(message):
+    return str(bot.get_state(message.from_user.id, message.chat.id))
+
+
+def log_message(message):
+    state = get_state(message)
+    logger.debug(f"[{message.from_user.username} - {message.chat.id}] <{state}> |{str(message.text)}|")
+
+
 def process_video(video_fname: str, output_dir):
     # split video to images and save to folder
     video2frames(video_fname, output_dir)
@@ -183,7 +236,9 @@ def generate(images_folder: str, questions: List[str]) -> pd.DataFrame:
     print('images folder', images_folder)
     print('questions', questions)
     controller = Controller()
-    images = list(sorted(os.listdir(images_folder), key=get_number))
+    images = [os.path.abspath(os.path.join(images_folder, image_fname)) for image_fname in os.listdir(images_folder)]
+    images = list(sorted(images, key=get_number))
+    print(images)
     loop = asyncio.new_event_loop()
     nest_asyncio.apply(loop)
     # asyncio.set_event_loop(asyncio.new_event_loop())
@@ -192,17 +247,17 @@ def generate(images_folder: str, questions: List[str]) -> pd.DataFrame:
     loop.run_until_complete(future)
     res = future.result()
     df = res['dataframe']
-    return res
+    return df
 
 
 def get_number(image_path: str):
     basename = os.path.basename(image_path)
-    return int(basename.split(".")[0])
+    if basename.split(".")[0].isdigit():
+        return int(basename.split(".")[0])
+    return basename
 
 
 def main():
-    logging.getLogger("bot").setLevel(logging.DEBUG)
-    telebot.logger.setLevel(logging.DEBUG)
     bot.add_custom_filter(custom_filters.StateFilter(bot))
     bot.infinity_polling(logger_level=logging.DEBUG)
 
