@@ -1,9 +1,14 @@
+import sys
+sys.path.append('/home/jovyan/sberai_hack')
+print(sys.path)
+
 import asyncio
 import io
 import logging
 import os
 import zipfile
 import datetime
+import traceback
 
 import nest_asyncio
 import telebot
@@ -139,7 +144,9 @@ def input_processed_info(message, images_path, msg='Картинки загру�
         data['questions'] = []
 
     markup = add_buttons(["Завершить ввод вопросов"])
-    bot.send_message(message.chat.id, f"{msg}. Введите вопросы, на которые вы хотите получить ответы: ",
+    bot.send_message(message.chat.id,
+                     f"""{msg}. Введите вопросы, на которые вы хотите получить ответы:
+                     Пример: сколько людей на изображении? Доволен ли человек на изображении?""",
                      reply_markup=markup)
 
 
@@ -157,6 +164,7 @@ def generate_and_get_feedback(message):
     except Exception as e:
         logger.error(e)
         print(e)
+        print(traceback.format_exc())
         bot.set_state(message.from_user.id, MyStates.start, message.chat.id)
         bot.send_message(message.chat.id, "Генерация завершилась неуспешно. Попробуйте, пожалуйста, ещё раз. ")
         return
@@ -183,7 +191,9 @@ def generate(images_folder: str, questions: List[str]) -> pd.DataFrame:
     print('images folder', images_folder)
     print('questions', questions)
     controller = Controller()
-    images = list(sorted(os.listdir(images_folder), key=get_number))
+    images = [os.path.abspath(os.path.join(images_folder, image_fname)) for image_fname in os.listdir(images_folder)]
+    images = list(sorted(images, key=get_number))
+    print(images)
     loop = asyncio.new_event_loop()
     nest_asyncio.apply(loop)
     # asyncio.set_event_loop(asyncio.new_event_loop())
@@ -192,7 +202,7 @@ def generate(images_folder: str, questions: List[str]) -> pd.DataFrame:
     loop.run_until_complete(future)
     res = future.result()
     df = res['dataframe']
-    return res
+    return df
 
 
 def get_number(image_path: str):
