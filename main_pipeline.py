@@ -10,7 +10,7 @@ from evaluation.gpt_questions_evaluation import questions_eval
 from evaluation.gpt_vqa_evaluation import vqa_eval
 from typing import Dict, List
 
-from configs.configs import LLAVA_URLS, EVALUATION_ON, FAISS_APPLICATION_URL
+from configs.configs import LLAVA_URLS, EVALUATION_ON, FAISS_APPLICATION_URL, MAIN_PIPELINE_TIMEOUT
 
 
 class Controller:
@@ -26,13 +26,13 @@ class Controller:
     async def main_pipeline(self, image_files):
         columns = json.loads(
             requests.post(f'{FAISS_APPLICATION_URL[0]}/fill_questions_db/',
-                          data={"image_files": ' '.join(image_files)}).text)
+                          data={"image_files": ' '.join(image_files)}, timeout=MAIN_PIPELINE_TIMEOUT).text)
         self.columns += columns
 
         answers_ordered = {column: {} for column in self.columns}
         tasks = []
 
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=MAIN_PIPELINE_TIMEOUT)) as session:
             for i, image_file in enumerate(image_files):
                 url = self._distribute_questions_creation(i, "create_vqa")
                 vqa_evaluation_pairs = []
@@ -41,7 +41,7 @@ class Controller:
                     task = asyncio.ensure_future(
                         self._request_vqa_handler(session=session, url=url, answers=answers_ordered, index=i,
                                                   payload={"image_file": image_file,
-                                                           "question": question + 'Please answer one number, word or phrase.'},
+                                                           "question": question + ' Please answer one number, word or phrase.'},
                                                   vqa_evaluation_handles=vqa_evaluation_pairs)
                     )
 
@@ -58,8 +58,17 @@ class Controller:
                 "dataframe": self._create_dataframe(answers_ordered)}
 
     @staticmethod
-    def _create_dataframe(answers: Dict[str, Dict[int, str]]):
-        return answers
+    def _create_dataframe(answers: Dict[str, Dict]):
+        data = {}
+
+        for column, responses_ordered in answers.items():
+            values = []
+            for task_id, response in dict(sorted(responses_ordered.items())).items():
+                values.append(response['outputs'].rstrip('</s>'))
+
+            data[column] = values
+
+        return pd.DataFrame(data)
 
     async def _request_vqa_handler(self, session: aiohttp.ClientSession, url, payload,
                                    answers: Dict[str, Dict[int, str]], index: int, vqa_evaluation_handles: List):
@@ -70,7 +79,7 @@ class Controller:
                 if self.evaluation_on and np.random.choice([False, True]):
                     vqa_evaluation_handles.append({data['question']: data['answer']})
 
-                answers[data['question']][index] = data['answer']
+                answers[data['question'].rstrip(' Please answer one number, word or phrase.')][index] = data['answer']
             else:
                 print("Request failed with status code:", response.status)
 
